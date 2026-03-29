@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#0a0a0a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Kartvizit"/>
+<title>Dijital Kartvizit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1e1e1e;
+    --border: rgba(255,255,255,0.08);
+    --text: #f0ede8;
+    --muted: #888;
+    --accent: #d4a853;
+    --accent2: #e8c87a;
+    --radius: 16px;
+    --font-display: 'DM Serif Display', serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* ── GRAIN OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999; opacity: 0.4;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: 24px 20px 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--text); }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    margin: 20px;
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 4px;
+    gap: 4px;
+  }
+  .tab {
+    flex: 1; padding: 10px;
+    border: none; background: transparent;
+    color: var(--muted); font-family: var(--font-body);
+    font-size: 0.85rem; font-weight: 500;
+    border-radius: 9px; cursor: pointer;
+    transition: all .2s;
+  }
+  .tab.active {
+    background: var(--surface2);
+    color: var(--text);
+    box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  }
+
+  /* ── SECTIONS ── */
+  .section { display: none; padding: 0 20px 100px; animation: fadeUp .3s ease; }
+  .section.active { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── CARD PREVIEW ── */
+  .preview-wrap {
+    perspective: 1000px;
+    margin-bottom: 28px;
+  }
+  .card-preview {
+    width: 100%; aspect-ratio: 1.75;
+    border-radius: 18px;
+    padding: 22px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; overflow: hidden;
+    transition: transform .4s ease, box-shadow .4s ease;
+    transform-style: preserve-3d;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    cursor: pointer;
+  }
+  .card-preview:active { transform: scale(0.97); }
+
+  /* Şablon renkleri */
+  .card-preview.tmpl-minimal {
+    background: #f5f2ed;
+    color: #1a1a1a;
+  }
+  .card-preview.tmpl-corporate {
+    background: linear-gradient(135deg, #0d1b3e 0%, #1a3a6b 100%);
+    color: #fff;
+  }
+  .card-preview.tmpl-creative {
+    background: linear-gradient(135deg, #1a0533 0%, #3d0f6e 50%, #0d1b3e 100%);
+    color: #fff;
+  }
+  .card-preview.tmpl-dark {
+    background: linear-gradient(160deg, #0f0f0f 0%, #1a1a1a 100%);
+    color: #f0ede8;
+    border: 1px solid rgba(212,168,83,0.3);
+  }
+
+  /* Kart dekoratif elementler */
+  .card-preview::before {
+    content: '';
+    position: absolute;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    opacity: 0.06;
+    right: -60px; top: -60px;
+  }
+  .tmpl-minimal .card-preview::before  { background: #000; }
+  .tmpl-corporate .card-preview::before { background: #fff; }
+  .tmpl-creative .card-preview::before  { background: #a855f7; opacity: 0.15; }
+  .tmpl-dark .card-preview::before      { background: var(--accent); opacity: 0.12; }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .card-name {
+    font-family: var(--font-display);
+    font-size: clamp(1.1rem, 4vw, 1.4rem);
+    line-height: 1.2;
+    max-width: 65%;
+  }
+  .card-logo-wrap {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-logo-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .card-logo-placeholder { font-size: 1.3rem; opacity: 0.4; }
+
+  .card-title-company {
+    font-size: 0.72rem;
+    font-weight: 500;
+    opacity: 0.7;
+    margin-top: 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .card-bottom {
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .card-contacts { display: flex; flex-direction: column; gap: 2px; }
+  .card-contact-item {
+    font-size: 0.68rem;
+    opacity: 0.75;
+    font-weight: 400;
+  }
+
+  /* Accent çizgi */
+  .tmpl-minimal .card-name::after,
+  .tmpl-dark .card-name::after {
+    content: '';
+    display: block;
+    width: 28px; height: 2px;
+    background: var(--accent);
+    margin-top: 6px;
+    border-radius: 2px;
+  }
+  .tmpl-corporate .card-name::after {
+    content: '';
+    display: block;
+    width: 28px; height: 2px;
+    background: #5b9cf6;
+    margin-top: 6px;
+    border-radius: 2px;
+  }
+  .tmpl-creative .card-name::after {
+    content: '';
+    display: block;
+    width: 28px; height: 2px;
+    background: #c084fc;
+    margin-top: 6px;
+    border-radius: 2px;
+  }
+
+  /* QR in card */
+  .card-qr-mini {
+    width: 52px; height: 52px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    padding: 3px;
+    flex-shrink: 0;
+  }
+  .card-qr-mini canvas, .card-qr-mini img { width: 100% !important; height: 100% !important; }
+
+  /* ── ŞABLON SEÇİCİ ── */
+  .section-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 12px;
+    margin-top: 4px;
+  }
+
+  .template-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .tmpl-btn {
+    aspect-ratio: 1.75;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all .2s;
+    display: flex; align-items: flex-end;
+    padding: 10px;
+  }
+  .tmpl-btn.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .tmpl-btn span {
+    font-size: 0.7rem; font-weight: 600;
+    color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.6);
+    background: rgba(0,0,0,.35);
+    padding: 3px 8px; border-radius: 6px;
+    backdrop-filter: blur(4px);
+  }
+  .tmpl-btn.t-minimal  { background: #f5f2ed; }
+  .tmpl-btn.t-minimal span { color: #333; text-shadow: none; background: rgba(0,0,0,.08); }
+  .tmpl-btn.t-corporate{ background: linear-gradient(135deg,#0d1b3e,#1a3a6b); }
+  .tmpl-btn.t-creative { background: linear-gradient(135deg,#1a0533,#3d0f6e,#0d1b3e); }
+  .tmpl-btn.t-dark     { background: linear-gradient(160deg,#0f0f0f,#1a1a1a); border: 1px solid rgba(212,168,83,.3); }
+
+  /* ── FORM ── */
+  .field-group {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .field-group-label {
+    padding: 12px 16px 8px;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .field {
+    display: flex; align-items: center;
+    padding: 0 16px;
+    border-top: 1px solid var(--border);
+    gap: 10px;
+  }
+  .field:first-of-type { border-top: none; }
+  .field-icon { font-size: 1rem; opacity: 0.5; flex-shrink: 0; width: 20px; text-align: center; }
+  .field input {
+    flex: 1;
+    background: transparent;
+    border: none; outline: none;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    padding: 14px 0;
+  }
+  .field input::placeholder { color: var(--muted); }
+
+  /* Logo upload */
+  .logo-upload-btn {
+    width: 100%;
+    display: flex; align-items: center; gap: 12px;
+    background: transparent;
+    border: none; color: var(--text);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    padding: 14px 16px;
+    cursor: pointer;
+    border-top: 1px solid var(--border);
+  }
+  .logo-thumb {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; flex-shrink: 0;
+    overflow: hidden;
+  }
+  .logo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .logo-upload-text { flex: 1; text-align: left; }
+  .logo-upload-text small { display: block; font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+  .logo-chevron { opacity: 0.3; }
+  #logoInput { display: none; }
+
+  /* Color picker */
+  .color-row {
+    display: flex; gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    align-items: center;
+  }
+  .color-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform .15s;
+    flex-shrink: 0;
+  }
+  .color-dot.selected { border-color: #fff; transform: scale(1.2); }
+  .color-label { font-size: 0.75rem; color: var(--muted); margin-left: 4px; }
+
+  /* ── BUTTONS ── */
+  .btn-primary {
+    width: 100%;
+    padding: 16px;
+    background: var(--accent);
+    color: #0a0a0a;
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all .2s;
+    letter-spacing: 0.01em;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    width: 100%;
+    padding: 14px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-secondary:active { transform: scale(0.98); }
+
+  /* ── QR & SHARE TAB ── */
+  .qr-section {
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: 12px;
+    gap: 20px;
+  }
+  .qr-box {
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    width: 200px; height: 200px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 40px rgba(0,0,0,.5);
+  }
+  #qrCode { width: 100% !important; height: 100% !important; }
+  #qrCode canvas, #qrCode img { width: 100% !important; height: 100% !important; }
+
+  .qr-label {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    text-align: center;
+    color: var(--text);
+  }
+  .qr-sub { font-size: 0.8rem; color: var(--muted); text-align: center; max-width: 260px; }
+
+  .share-actions { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+
+  /* ── ADD TO HOME (PWA) BANNER ── */
+  .pwa-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .pwa-icon { font-size: 2rem; flex-shrink: 0; }
+  .pwa-text h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; }
+  .pwa-text p { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--text); color: var(--bg);
+    padding: 12px 24px; border-radius: 100px;
+    font-size: 0.85rem; font-weight: 600;
+    white-space: nowrap; z-index: 1000;
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(10,10,10,0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-btn {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 8px;
+    background: none; border: none;
+    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 0.65rem; font-weight: 500;
+    cursor: pointer;
+    transition: color .2s;
+  }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn svg { width: 22px; height: 22px; }
+
+  /* ── RESPONSIVE ── */
+  @media (min-width: 480px) {
+    .section { max-width: 440px; margin: 0 auto; }
+    .tabs { max-width: 440px; margin: 20px auto; }
+    header { max-width: 440px; margin: 0 auto; }
+  }
+
+  /* Shimmer for empty card */
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .empty-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: -20px;
+    margin-bottom: 20px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">kart<span>vizit</span></div>
+  <div style="font-size:0.75rem;color:var(--muted);">PWA</div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('design')">🎨 Tasarım</button>
+  <button class="tab" onclick="switchTab('info')">📋 Bilgiler</button>
+  <button class="tab" onclick="switchTab('share')">📤 Paylaş</button>
+</div>
+
+<!-- ═══════════════ TASARIM SEKMESİ ═══════════════ -->
+<div class="section active" id="tab-design">
+
+  <!-- Canlı Önizleme -->
+  <p class="section-title">Önizleme</p>
+  <div class="preview-wrap">
+    <div class="card-preview tmpl-minimal" id="cardPreview">
+      <div class="card-top">
+        <div>
+          <div class="card-name" id="previewName">Ad Soyad</div>
+          <div class="card-title-company" id="previewTitleCompany">Unvan · Şirket</div>
+        </div>
+        <div class="card-logo-wrap" id="previewLogoWrap">
+          <div class="card-logo-placeholder">🏢</div>
+        </div>
+      </div>
+      <div class="card-bottom">
+        <div class="card-contacts">
+          <div class="card-contact-item" id="previewEmail">email@ornek.com</div>
+          <div class="card-contact-item" id="previewPhone">+90 5XX XXX XX XX</div>
+          <div class="card-contact-item" id="previewSocial" style="display:none"></div>
+        </div>
+        <div class="card-qr-mini" id="previewQR"></div>
+      </div>
+    </div>
+  </div>
+  <p class="empty-hint" id="emptyHint">Bilgiler sekmesinden kartı doldurun</p>
+
+  <!-- Şablon Seçimi -->
+  <p class="section-title">Şablon</p>
+  <div class="template-grid">
+    <button class="tmpl-btn t-minimal selected" onclick="setTemplate('minimal',this)"><span>Minimal</span></button>
+    <button class="tmpl-btn t-corporate" onclick="setTemplate('corporate',this)"><span>Corporate</span></button>
+    <button class="tmpl-btn t-creative" onclick="setTemplate('creative',this)"><span>Creative</span></button>
+    <button class="tmpl-btn t-dark" onclick="setTemplate('dark',this)"><span>Dark Elite</span></button>
+  </div>
+
+  <button class="btn-primary" onclick="switchTab('info')">
+    ✏️ Bilgileri Düzenle
+  </button>
+</div>
+
+<!-- ═══════════════ BİLGİLER SEKMESİ ═══════════════ -->
+<div class="section" id="tab-info">
+
+  <!-- Kişisel -->
+  <div class="field-group">
+    <div class="field-group-label">Kişisel Bilgiler</div>
+    <div class="field">
+      <span class="field-icon">👤</span>
+      <input type="text" id="fFirstName" placeholder="Ad" oninput="updatePreview()" autocomplete="given-name"/>
+    </div>
+    <div class="field">
+      <span class="field-icon"></span>
+      <input type="text" id="fLastName" placeholder="Soyad" oninput="updatePreview()" autocomplete="family-name"/>
+    </div>
+    <div class="field">
+      <span class="field-icon">💼</span>
+      <input type="text" id="fTitle" placeholder="Unvan (CEO, Designer...)" oninput="updatePreview()"/>
+    </div>
+  </div>
+
+  <!-- Şirket -->
+  <div class="field-group">
+    <div class="field-group-label">Şirket</div>
+    <div class="field">
+      <span class="field-icon">🏢</span>
+      <input type="text" id="fCompany" placeholder="Şirket Adı" oninput="updatePreview()" autocomplete="organization"/>
+    </div>
+    <button class="logo-upload-btn" onclick="document.getElementById('logoInput').click()">
+      <div class="logo-thumb" id="logoThumb"><span>📷</span></div>
+      <div class="logo-upload-text">
+        Logo Yükle
+        <small>PNG, JPG (isteğe bağlı)</small>
+      </div>
+      <span class="logo-chevron">›</span>
+    </button>
+    <input type="file" id="logoInput" accept="image/*" onchange="handleLogo(this)"/>
+  </div>
+
+  <!-- İletişim -->
+  <div class="field-group">
+    <div class="field-group-label">İletişim</div>
+    <div class="field">
+      <span class="field-icon">✉️</span>
+      <input type="email" id="fEmail" placeholder="E-posta adresi" oninput="updatePreview()" autocomplete="email"/>
+    </div>
+    <div class="field">
+      <span class="field-icon">📞</span>
+      <input type="tel" id="fPhone" placeholder="+90 5XX XXX XX XX" oninput="updatePreview()" autocomplete="tel"/>
+    </div>
+    <div class="field">
+      <span class="field-icon">🌐</span>
+      <input type="url" id="fWebsite" placeholder="https://siteniz.com" oninput="updatePreview()"/>
+    </div>
+  </div>
+
+  <!-- Sosyal Medya -->
+  <div class="field-group">
+    <div class="field-group-label">Sosyal Medya</div>
+    <div class="field">
+      <span class="field-icon">in</span>
+      <input type="text" id="fLinkedIn" placeholder="LinkedIn kullanıcı adı" oninput="updatePreview()"/>
+    </div>
+    <div class="field">
+      <span class="field-icon">𝕏</span>
+      <input type="text" id="fTwitter" placeholder="Twitter / X kullanıcı adı" oninput="updatePreview()"/>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="saveAndGoShare()">
+    💾 Kaydet &amp; Paylaş
+  </button>
+</div>
+
+<!-- ═══════════════ PAYLAŞ SEKMESİ ═══════════════ -->
+<div class="section" id="tab-share">
+
+  <!-- PWA Banner -->
+  <div class="pwa-banner">
+    <div class="pwa-icon">📲</div>
+    <div class="pwa-text">
+      <h3>Ana Ekrana Ekle</h3>
+      <p>Safari'de <strong>Paylaş → Ana Ekrana Ekle</strong> ile bu uygulamayı iPhone'unuza yükleyin. Wallet gibi çalışır, ücretsiz!</p>
+    </div>
+  </div>
+
+  <div class="qr-section">
+    <div class="qr-box">
+      <div id="qrCode"></div>
+    </div>
+    <div>
+      <div class="qr-label" id="shareCardName">Kartınız hazır</div>
+      <div class="qr-sub">QR kodu taratın veya vCard olarak indirin</div>
+    </div>
+  </div>
+
+  <div class="share-actions">
+    <button class="btn-primary" onclick="downloadVCard()">
+      📥 Kişi Kartı İndir (.vcf)
+    </button>
+    <button class="btn-secondary" onclick="shareCard()">
+      📤 Paylaş / Linki Kopyala
+    </button>
+    <button class="btn-secondary" onclick="downloadQR()">
+      🖼️ QR Kodu İndir
+    </button>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+let currentTemplate = 'minimal';
+let logoDataURL = null;
+let qrInstance = null;
+
+// ─────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['design','info','share'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+
+  if (name === 'share') {
+    generateQR();
+  }
+}
+
+// ─────────────────────────────────────────
+// TEMPLATE
+// ─────────────────────────────────────────
+function setTemplate(tmpl, btn) {
+  currentTemplate = tmpl;
+  document.querySelectorAll('.tmpl-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+
+  const card = document.getElementById('cardPreview');
+  card.className = 'card-preview tmpl-' + tmpl;
+  updatePreview();
+}
+
+// ─────────────────────────────────────────
+// PREVIEW UPDATE
+// ─────────────────────────────────────────
+function updatePreview() {
+  const fn = v('fFirstName'), ln = v('fLastName');
+  const title = v('fTitle'), company = v('fCompany');
+  const email = v('fEmail'), phone = v('fPhone');
+  const linkedin = v('fLinkedIn'), twitter = v('fTwitter');
+
+  const fullName = (fn + ' ' + ln).trim() || 'Ad Soyad';
+  const titleCo = [title, company].filter(Boolean).join(' · ') || 'Unvan · Şirket';
+  const social = linkedin ? 'in/' + linkedin : (twitter ? '@' + twitter : '');
+
+  el('previewName').textContent = fullName;
+  el('previewTitleCompany').textContent = titleCo;
+  el('previewEmail').textContent = email || 'email@ornek.com';
+  el('previewPhone').textContent = phone || '+90 5XX XXX XX XX';
+
+  const socialEl = el('previewSocial');
+  if (social) { socialEl.textContent = social; socialEl.style.display = ''; }
+  else { socialEl.style.display = 'none'; }
+
+  const hint = el('emptyHint');
+  hint.style.display = (fn || ln || email) ? 'none' : '';
+
+  // Mini QR in card
+  const miniQR = el('previewQR');
+  miniQR.innerHTML = '';
+  const qrText = buildVCardText();
+  if (qrText.length > 30) {
+    try {
+      new QRCode(miniQR, {
+        text: qrText,
+        width: 52, height: 52,
+        colorDark: '#000', colorLight: '#fff',
+        correctLevel: QRCode.CorrectLevel.L
+      });
+    } catch(e) {}
+  }
+
+  // Share name
+  el('shareCardName').textContent = fullName;
+}
+
+// ─────────────────────────────────────────
+// LOGO
+// ─────────────────────────────────────────
+function handleLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    logoDataURL = e.target.result;
+    // Update thumb
+    const thumb = el('logoThumb');
+    thumb.innerHTML = `<img src="${logoDataURL}" alt="logo"/>`;
+    // Update card preview
+    const wrap = el('previewLogoWrap');
+    wrap.innerHTML = `<img src="${logoDataURL}" alt="logo"/>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─────────────────────────────────────────
+// VCARD
+// ─────────────────────────────────────────
+function buildVCardText() {
+  const fn = v('fFirstName'), ln = v('fLastName');
+  const title = v('fTitle'), company = v('fCompany');
+  const email = v('fEmail'), phone = v('fPhone');
+  const website = v('fWebsite');
+  const linkedin = v('fLinkedIn'), twitter = v('fTwitter');
+
+  let lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `N:${ln};${fn};;;`,
+    `FN:${fn} ${ln}`,
+  ];
+  if (title)   lines.push(`TITLE:${title}`);
+  if (company) lines.push(`ORG:${company}`);
+  if (phone)   lines.push(`TEL;TYPE=CELL:${phone}`);
+  if (email)   lines.push(`EMAIL:${email}`);
+  if (website) lines.push(`URL:${website}`);
+  if (linkedin) lines.push(`X-SOCIALPROFILE;type=linkedin:https://linkedin.com/in/${linkedin}`);
+  if (twitter)  lines.push(`X-SOCIALPROFILE;type=twitter:https://x.com/${twitter}`);
+  lines.push('END:VCARD');
+  return lines.join('\n');
+}
+
+function downloadVCard() {
+  const content = buildVCardText();
+  const fn = v('fFirstName') || 'kartvizit';
+  const ln = v('fLastName') || '';
+  const blob = new Blob([content], { type: 'text/vcard;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${fn}_${ln}.vcf`.replace(/\s+/g,'_');
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ Kişi kartı indirildi');
+}
+
+// ─────────────────────────────────────────
+// QR
+// ─────────────────────────────────────────
+function generateQR() {
+  const container = el('qrCode');
+  container.innerHTML = '';
+  const text = buildVCardText();
+  if (!text || text.length < 40) {
+    container.innerHTML = '<p style="font-size:0.75rem;color:#999;text-align:center;padding:20px;">Önce bilgilerinizi doldurun</p>';
+    return;
+  }
+  try {
+    new QRCode(container, {
+      text,
+      width: 160, height: 160,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } catch(e) {
+    container.innerHTML = '<p style="font-size:0.75rem;color:#999;">QR oluşturulamadı</p>';
+  }
+}
+
+function downloadQR() {
+  const canvas = document.querySelector('#qrCode canvas');
+  if (!canvas) { showToast('⚠️ Önce QR oluşturun'); return; }
+  const link = document.createElement('a');
+  link.download = 'qr_kartvizit.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  showToast('✅ QR kod indirildi');
+}
+
+// ─────────────────────────────────────────
+// SHARE
+// ─────────────────────────────────────────
+async function shareCard() {
+  const fn = v('fFirstName'), ln = v('fLastName');
+  const text = `${fn} ${ln} — Dijital Kartvizit`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: text,
+        text: `${fn} ${ln}\n${v('fTitle')} @ ${v('fCompany')}\n${v('fEmail')}\n${v('fPhone')}`,
+        url: window.location.href
+      });
+    } catch(e) {}
+  } else {
+    await navigator.clipboard.writeText(window.location.href);
+    showToast('📋 Link kopyalandı');
+  }
+}
+
+// ─────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────
+function saveAndGoShare() {
+  updatePreview();
+  switchTab('share');
+}
+
+function showToast(msg) {
+  const t = el('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function v(id) { return el(id).value.trim(); }
+function el(id) { return document.getElementById(id); }
+
+// ─────────────────────────────────────────
+// PWA SERVICE WORKER
+// ─────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  const sw = `
+    const CACHE = 'kartvizit-v1';
+    const ASSETS = ['/'];
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    });
+  `;
+  const blob = new Blob([sw], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+updatePreview();
+</script>
+</body>
+</html>
