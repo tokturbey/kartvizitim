@@ -659,7 +659,8 @@ function switchTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
 
   if (name === 'share') {
-    generateQR();
+    // Delay QR generation to ensure DOM is ready on mobile
+    setTimeout(() => generateQR(), 100);
   }
 }
 
@@ -701,19 +702,26 @@ function updatePreview() {
   const hint = el('emptyHint');
   hint.style.display = (fn || ln || email) ? 'none' : '';
 
-  // Mini QR in card
+  // Mini QR in card - FIXED FOR MOBILE
   const miniQR = el('previewQR');
   miniQR.innerHTML = '';
   const qrText = buildVCardText();
   if (qrText.length > 30) {
     try {
+      // Clear any previous instance
+      if (miniQR._qrInstance) delete miniQR._qrInstance;
+      
       new QRCode(miniQR, {
         text: qrText,
-        width: 52, height: 52,
-        colorDark: '#000', colorLight: '#fff',
+        width: 52, 
+        height: 52,
+        colorDark: '#000', 
+        colorLight: '#fff',
         correctLevel: QRCode.CorrectLevel.L
       });
-    } catch(e) {}
+    } catch(e) {
+      console.error('Mini QR error:', e);
+    }
   }
 
   // Share name
@@ -781,37 +789,73 @@ function downloadVCard() {
 }
 
 // ─────────────────────────────────────────
-// QR
+// QR - MOBILE FIXED
 // ─────────────────────────────────────────
 function generateQR() {
   const container = el('qrCode');
+  
+  // Clear previous QR completely
   container.innerHTML = '';
+  
   const text = buildVCardText();
   if (!text || text.length < 40) {
     container.innerHTML = '<p style="font-size:0.75rem;color:#999;text-align:center;padding:20px;">Önce bilgilerinizi doldurun</p>';
     return;
   }
+
   try {
-    new QRCode(container, {
-      text,
-      width: 160, height: 160,
-      colorDark: '#000000',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
+    // Ensure container has explicit dimensions for mobile
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'center';
+    container.style.width = '160px';
+    container.style.height = '160px';
+
+    // Use requestAnimationFrame to ensure DOM is fully ready
+    requestAnimationFrame(() => {
+      try {
+        new QRCode(container, {
+          text: text,
+          width: 160,
+          height: 160,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M,
+          useSVG: false  // Force canvas rendering which works better on mobile
+        });
+        
+        // Fix for iOS: ensure canvas is responsive
+        const canvas = container.querySelector('canvas');
+        if (canvas) {
+          canvas.style.width = '100%';
+          canvas.style.height = '100%';
+          canvas.style.maxWidth = '160px';
+          canvas.style.maxHeight = '160px';
+        }
+      } catch(e) {
+        console.error('QRCode generation error:', e);
+        container.innerHTML = '<p style="font-size:0.75rem;color:#999;">⚠️ QR oluşturulamadı</p>';
+      }
     });
   } catch(e) {
-    container.innerHTML = '<p style="font-size:0.75rem;color:#999;">QR oluşturulamadı</p>';
+    console.error('QR setup error:', e);
+    container.innerHTML = '<p style="font-size:0.75rem;color:#999;">⚠️ QR oluşturulamadı</p>';
   }
 }
 
 function downloadQR() {
   const canvas = document.querySelector('#qrCode canvas');
   if (!canvas) { showToast('⚠️ Önce QR oluşturun'); return; }
-  const link = document.createElement('a');
-  link.download = 'qr_kartvizit.png';
-  link.href = canvas.toDataURL('image/png');
-  link.click();
-  showToast('✅ QR kod indirildi');
+  
+  try {
+    const link = document.createElement('a');
+    link.download = 'qr_kartvizit.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('✅ QR kod indirildi');
+  } catch(e) {
+    showToast('❌ Hata: QR indirilemedi');
+  }
 }
 
 // ─────────────────────────────────────────
